@@ -1,5 +1,8 @@
 import type { WebSocket } from "ws";
+import twilio from "twilio";
 import type { TwilioStreamMessage, TwilioStreamMessageTypes } from "./types";
+
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 let streamSid: string;
 export function setStreamSid(sid: string) {
@@ -37,5 +40,13 @@ export function onMessage<T extends TwilioStreamMessageTypes>(
   ws.on("message", (data) => {
     const msg = JSON.parse(data.toString()) as TwilioStreamMessage;
     if (msg.event === type) callback(msg as TwilioStreamMessage & { event: T });
+  });
+}
+
+export async function makeOutboundCall(to: string) {
+  return client.calls.create({
+    url: `https://${process.env.HOSTNAME}/incoming-call`,
+    to: to,
+    from: process.env.TWILIO_PHONE_NUMBER as string,
   });
 }

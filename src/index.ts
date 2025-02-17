@@ -6,6 +6,8 @@ import log from "./logger";
 import * as oai from "./openai";
 import * as twlo from "./twilio";
 import type { CallStatus } from "./types";
+import type { Response } from "express";
+import type { Request } from "express";
 
 dotenv.config();
 
@@ -15,7 +17,7 @@ app.use(express.urlencoded({ extended: true })).use(express.json());
 /****************************************************
  Twilio Voice Webhook Endpoints
 ****************************************************/
-app.post("/incoming-call", async (req, res) => {
+app.post("/incoming-call", async (req: express.Request, res: express.Response) => {
   log.twl.info(`incoming-call from ${req.body.From} to ${req.body.To}`);
 
   try {
@@ -46,7 +48,7 @@ app.post("/incoming-call", async (req, res) => {
   }
 });
 
-app.post("/call-status-update", async (req, res) => {
+app.post("/call-status-update", async (req: express.Request, res: express.Response) => {
   const status = req.body.CallStatus as CallStatus;
 
   if (status === "error") log.twl.error(`call-status-update ${status}`);
@@ -55,6 +57,25 @@ app.post("/call-status-update", async (req, res) => {
   if (status === "error" || status === "completed") oai.closeWebsocket();
 
   res.status(200).send();
+});
+
+/****************************************************
+ Outbound Call Endpoint
+****************************************************/
+interface MakeCallRequest {
+  phoneNumber: string;
+}
+
+app.post("/make-call", async (req: express.Request, res: express.Response) => {
+  const { phoneNumber } = req.body as MakeCallRequest;
+
+  try {
+    await twlo.makeOutboundCall(phoneNumber);
+    res.status(200).send("Call initiated successfully.");
+  } catch (error) {
+    log.twl.error("Failed to initiate call", error);
+    res.status(500).send("Failed to initiate call.");
+  }
 });
 
 /****************************************************
