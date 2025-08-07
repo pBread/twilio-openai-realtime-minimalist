@@ -1,4 +1,4 @@
-import dotenv from "dotenv-flow";
+import "dotenv-flow/config";
 import express from "express";
 import ExpressWs from "express-ws";
 import log from "./logger";
@@ -6,8 +6,8 @@ import config from "./openai-config";
 import type { CallStatus } from "./twilio";
 import { TwilioMediaStreamWebsocket } from "./twilio";
 import { OpenAIRealtimeWebSocket } from "openai/beta/realtime/websocket";
-
-dotenv.config();
+import OpenAI from "openai";
+import { SessionCreateResponse } from "openai/resources/beta/realtime/sessions";
 
 const { app } = ExpressWs(express());
 app.use(express.urlencoded({ extended: true })).use(express.json());
@@ -15,10 +15,27 @@ app.use(express.urlencoded({ extended: true })).use(express.json());
 // ========================================
 // Twilio Voice Webhook Endpoints
 // ========================================
+let clientSecret: SessionCreateResponse.ClientSecret;
+
 app.post("/incoming-call", async (req, res) => {
   log.twl.info(`incoming-call from ${req.body.From} to ${req.body.To}`);
 
   try {
+    const oai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const session = await oai.beta.realtime.sessions.create({
+      // @ts-expect-error
+      model: "gpt-4o-realtime-preview-2025-07-29",
+      instructions: "You are a bot that tells jokes",
+      input_audio_format: "g711_ulaw",
+      output_audio_format: "g711_ulaw",
+      modalities: ["text", "audio"],
+      turn_detection: { type: "server_vad" },
+    });
+
+    clientSecret = session.client_secret;
+
+    log.app.info("session", session);
+
     res.status(200);
     res.type("text/xml");
 
@@ -52,8 +69,18 @@ app.post("/call-status", async (req, res) => {
 // Twilio Media Stream Websocket Endpoint
 // ========================================
 app.ws("/media-stream", async (ws, req) => {
-  const rt = new OpenAIRealtimeWebSocket({ model: config.openai.model });
+  log.twl.info("websocket initializing");
+
+  const client = new OpenAI({ apiKey: clientSecret.value });
+  const rt = new OpenAIRealtimeWebSocket(
+    {
+      model: "gpt-4o-realtime-preview-2025-07-29",
+    },
+    client,
+  );
   const tw = new TwilioMediaStreamWebsocket(ws);
+
+  rt.on("session.created", (msg) => log.oai.info("session.created\n", msg));
 
   // await for both websockets to be connected
   await Promise.all([
@@ -65,6 +92,8 @@ app.ws("/media-stream", async (ws, req) => {
       }),
     ),
   ]);
+
+  log.app.info("promises resolved");
 
   // send bot's speech to twilio
   rt.on("response.audio.delta", (msg) =>
