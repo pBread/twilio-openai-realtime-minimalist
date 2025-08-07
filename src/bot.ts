@@ -10,5 +10,5 @@ const session: SessionCreateParams = {
 
 export default {
   session,
-  model: "gpt-4o-realtime-preview-2025-07-29",
+  model: "gpt-4o-realtime-preview",
 };
