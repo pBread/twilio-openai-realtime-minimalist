@@ -1,6 +1,5 @@
 export default {
-  introduction:
-    "Hello, this is Emma with Smalltown Gas and Electric. How can I help you today?",
+  introduction: `Hello, this is Emma with Smalltown Gas and Electric. Would you like to report an outage? Or is there something else I can help you with today?`,
 
   openai: {
     temperature: 0.8,
