@@ -1,20 +1,20 @@
 import dotenv from "dotenv-flow";
 import express from "express";
 import ExpressWs from "express-ws";
-import config from "../config";
 import log from "./logger";
 import * as oai from "./openai";
+import config from "./openai-config";
+import type { CallStatus } from "./twilio";
 import * as twlo from "./twilio";
-import type { CallStatus } from "./types";
 
 dotenv.config();
 
 const { app } = ExpressWs(express());
 app.use(express.urlencoded({ extended: true })).use(express.json());
 
-/****************************************************
- Twilio Voice Webhook Endpoints
-****************************************************/
+// ========================================
+// Twilio Voice Webhook Endpoints
+// ========================================
 app.post("/incoming-call", async (req, res) => {
   log.twl.info(`incoming-call from ${req.body.From} to ${req.body.To}`);
 
@@ -22,6 +22,7 @@ app.post("/incoming-call", async (req, res) => {
     oai.createWebsocket(); // This demo only supports one call at a time, hence a single OpenAI websocket is stored globally
     oai.ws.on("open", () => log.oai.info("openai websocket opened"));
     oai.ws.on("error", (err) => log.oai.error("openai websocket error", err));
+
     // The incoming-call webhook is blocked until the OpenAI websocket is connected.
     // This ensures Twilio's Media Stream doesn't send audio packets to OpenAI prematurely.
     await oai.wsPromise;
@@ -46,25 +47,35 @@ app.post("/incoming-call", async (req, res) => {
   }
 });
 
-app.post("/call-status-update", async (req, res) => {
+app.post("/call-status", async (req, res) => {
   const status = req.body.CallStatus as CallStatus;
 
-  if (status === "error") log.twl.error(`call-status-update ${status}`);
-  else log.twl.info(`call-status-update ${status}`);
+  if (status === "error") log.twl.error(`call-status ${status}`);
+  else log.twl.info(`call-status ${status}`);
 
   if (status === "error" || status === "completed") oai.closeWebsocket();
 
   res.status(200).send();
 });
 
-/****************************************************
- Twilio Media Stream Websocket Endpoint
-****************************************************/
+// ========================================
+// Twilio Media Stream Websocket Endpoint
+// ========================================
 app.ws("/media-stream", (ws, req) => {
   log.twl.info("incoming websocket");
 
-  twlo.setWs(ws);
+  twlo.setWs(ws); // set the Twilio Media Stream websocket
   twlo.ws.on("error", (err) => log.twl.error(`websocket error`, err));
+
+  const typeSet = new Set<string>();
+
+  oai.ws.on("message", (data: any) => {
+    const msg = JSON.parse(data);
+    if (!typeSet.has(msg.type)) {
+      log.oai.info(`new message type: ${msg.type}. msg: `, msg);
+    }
+    typeSet.add(msg.type);
+  });
 
   // twilio media stream starts
   twlo.onMessage("start", (msg) => {
@@ -94,6 +105,12 @@ app.ws("/media-stream", (ws, req) => {
   // bot final transcript
   oai.onMessage("response.audio_transcript.done", (msg) => {
     log.oai.info("bot transcript (final): ", msg.transcript);
+  });
+
+  twlo.ws.on("close", () => {
+    log.app.info("websocket closed");
+
+    log.oai.info("types: ", [...typeSet]);
   });
 });
 

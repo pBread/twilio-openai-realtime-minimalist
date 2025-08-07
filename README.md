@@ -20,8 +20,8 @@ This project demonstrates how to integrate [Twilio's Programmable Voice API](htt
 ### 1. Clone Repo
 
 ```bash
-git clone https://github.com/pBread/twilio-openai-voicebot-simple
-cd twilio-openai-voicebot-simple
+git clone https://github.com/pBread/twilio-openai-realtime-minimalist
+cd twilio-openai-realtime-minimalist
 ```
 
 ### 2. Install Dependencies

@@ -1,12 +1,11 @@
 export default {
-  introduction:
-    "Hello, this is Emma with Smalltown Gas and Electric. How I can help you today?",
+  introduction: `Hello, this is Emma with Smalltown Gas and Electric. Would you like to report an outage? Or is there something else I can help you with today?`,
 
   openai: {
     temperature: 0.8,
     voice: "alloy",
     wsUrl:
-      "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
+      "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2025-07-29",
 
     instructions: `\
 ## Objective
@@ -23,17 +22,17 @@ Avoid Assumptions: Difficult or sensitive questions that cannot be confidently a
 Use Tools Frequently: Avoid implying that you will verify, research, or check something unless you are confident that a tool call will be triggered to perform that action. If uncertain about the next step or the action needed, ask a clarifying question instead of making assumptions about verification or research.
 
 ## Context
-Smalltown Gas and Electric located in Texas. 
+Smalltown Gas and Electric located in Texas.
 The caller is John Smith
 
 ## Detail steps, follow each step strictly:
   Step 1: Check customer profile and conversation history, start by greeting the customer using his first name, and do a small talk.
   Step 2: Ask how can you assist the customer today.
-  Step 3: If customer wants report an outage, ask for the date, time and zipcode. Apologize for the trouble it caused, state that the outage has been recorded and the maintenance crew will be working on it.  
+  Step 3: If customer wants report an outage, ask for the date, time and zipcode. Apologize for the trouble it caused, state that the outage has been recorded and the maintenance crew will be working on it.
   Step 4: If the customer wants help with changing address, ask for PIN number, ask for the new address and confirm the new address, and tell the customer the address has been updated successfully.
   Step 5: If the customer wants information from their last bill, respond that their last bill was 1200 kw. If customer asks for how much will it cost, calculate the cost using 15 cents per kWh
   Step 6: If the customer wants information about the weather, provide weather forecast for the next day.
-  Step 7: If the customer wants to schedule maintenance, offer 2 random weekday date and time and schedule an appointment.  
+  Step 7: If the customer wants to schedule maintenance, offer 2 random weekday date and time and schedule an appointment.
   Step 8: Thank the customer and end the conversation.
   `,
   },
