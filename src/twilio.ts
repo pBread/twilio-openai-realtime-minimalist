@@ -1,5 +1,14 @@
 import type { WebSocket } from "ws";
 
+/**
+ * A typed WebSocket adapter for Twilio Media Streams.
+ *
+ * This class wraps a raw WebSocket connection and adds strong typing
+ * for Twilio's media stream messages and actions. It handles automatic
+ * JSON parsing and serializing, and provides a setup promise that resolves
+ * once the `start` event is received.
+ */
+
 export class TwilioMediaStreamWebsocket {
   private ws: WebSocket;
   public conf: StartEvent["start"] | undefined;
@@ -10,25 +19,24 @@ export class TwilioMediaStreamWebsocket {
 
     this.setupPromise = new Promise((resolve) => {
       this.on("start", (msg: StartEvent) => {
-        this.conf = msg["start"];
+        this.conf = msg.start;
         resolve();
       });
     });
   }
 
-  send(action: TwilioStreamAction) {
-    this.ws.send(JSON.stringify(action));
-  }
+  send = (action: TwilioStreamAction) => this.ws.send(JSON.stringify(action));
 
-  on<K extends TwilioStreamMessageTypes>(
+  on = <K extends TwilioStreamMessageTypes>(
     event: K,
     handler: (msg: Extract<TwilioStreamMessage, { event: K }>) => void,
-  ) {
+  ) =>
     this.ws.on("message", (data) => {
-      const msg = JSON.parse(event.toString()) as TwilioStreamMessage;
-      if (msg.event === event) handler(msg);
+      const msg = JSON.parse(data.toString()) as TwilioStreamMessage;
+      if (msg.event === event) {
+        handler(msg as Extract<TwilioStreamMessage, { event: K }>);
+      }
     });
-  }
 }
 
 // ========================================
