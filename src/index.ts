@@ -82,6 +82,17 @@ app.ws("/media-stream/:client_secret", async (ws, req) => {
 
   log.twl.info("websocket connected");
 
+  // prompts the agent to say something
+  rt.send({
+    type: "response.create",
+    response: {
+      instructions: `You just answered the call. Say hello in English.`,
+    },
+  });
+
+  // ========================================
+  // Audio Orchestration
+  // ========================================
   // send bot's speech to twilio
   rt.on("response.audio.delta", (msg) =>
     tw.send({
@@ -102,14 +113,6 @@ app.ws("/media-stream/:client_secret", async (ws, req) => {
 
     rt.send({ type: "input_audio_buffer.clear" });
     tw.send({ event: "clear", streamSid: tw.streamSid! });
-  });
-
-  // prompts the agent to say something
-  rt.send({
-    type: "response.create",
-    response: {
-      instructions: `You just answered the call. Say hello in English.`,
-    },
   });
 
   // clean up websocket
