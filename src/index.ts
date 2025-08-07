@@ -52,10 +52,6 @@ app.post("/call-status", async (req, res) => {
 // Twilio Media Stream Websocket Endpoint
 // ========================================
 app.ws("/media-stream", async (ws, req) => {
-  log.app.info("req.body\n", req.body); // checking for payload
-  log.app.info("req.headers\n", req.headers); // checking for payload
-  log.app.info("req.params\n", req.params); // checking for payload
-
   const rt = new OpenAIRealtimeWebSocket({ model: config.openai.model });
   const tw = new TwilioMediaStreamWebsocket(ws);
 
