@@ -12,9 +12,9 @@ dotenv.config();
 const { app } = ExpressWs(express());
 app.use(express.urlencoded({ extended: true })).use(express.json());
 
-/****************************************************
- Twilio Voice Webhook Endpoints
-****************************************************/
+// ========================================
+// Twilio Voice Webhook Endpoints
+// ========================================
 app.post("/incoming-call", async (req, res) => {
   log.twl.info(`incoming-call from ${req.body.From} to ${req.body.To}`);
 
@@ -57,9 +57,9 @@ app.post("/call-status-update", async (req, res) => {
   res.status(200).send();
 });
 
-/****************************************************
- Twilio Media Stream Websocket Endpoint
-****************************************************/
+// ========================================
+// Twilio Media Stream Websocket Endpoint
+// ========================================
 app.ws("/media-stream", (ws, req) => {
   log.twl.info("incoming websocket");
 
