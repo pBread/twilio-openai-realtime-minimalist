@@ -115,7 +115,7 @@ app.ws("/media-stream", async (ws, req) => {
     type: "response.create",
     response: {
       modalities: ["text", "audio"],
-      instructions: `Say an introduction`,
+      instructions: `You just answered the call. Say hello in English.`,
     },
   });
 
