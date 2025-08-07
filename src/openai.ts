@@ -54,9 +54,6 @@ export function speak(text: string) {
 }
 
 /** Send raw audio packets to OpenAI's websocket (https://platform.openai.com/docs/api-reference/realtime-client-events/input_audio_buffer/append) */
-export function sendAudio(audio: string) {
-  ws?.send(JSON.stringify({ type: "input_audio_buffer.append", audio }));
-}
 
 /** Sets the OpenAI Realtime session parameter per the demo configuation.
  *
@@ -64,39 +61,11 @@ export function sendAudio(audio: string) {
  * but, setting them slightly later (i.e. when the Twilio Media starts) seems to make
  * OpenAI's bot more responsive.
  */
-export function setSessionParams() {
-  ws?.send(
-    JSON.stringify({
-      type: "session.update",
-      session: {
-        input_audio_format: "g711_ulaw",
-        output_audio_format: "g711_ulaw",
-        modalities: ["text", "audio"],
-        turn_detection: { type: "server_vad" }, // VAD (voice activity detection) enables input_audio_buffer.speech_started / .speech_stopped
-
-        instructions: config.openai.instructions,
-        temperature: config.openai.temperature,
-        voice: config.openai.voice,
-      },
-    }),
-  );
-}
 
 // ========================================
 // Websocket Listeners
 // https://platform.openai.com/docs/api-reference/realtime-server-events
 // ========================================
-
-/** Adds an listener to an incoming message type */
-export function onMessage<T extends OpenAIStreamMessageTypes>(
-  type: T,
-  callback: (message: OpenAIStreamMessage & { type: T }) => void,
-) {
-  ws.on("message", (data) => {
-    const msg = JSON.parse(data.toString()) as OpenAIStreamMessage;
-    if (msg.type === type) callback(msg as OpenAIStreamMessage & { type: T });
-  });
-}
 
 // ========================================
 // Open AI Actions

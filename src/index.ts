@@ -23,7 +23,7 @@ app.post("/incoming-call", async (req, res) => {
     const session = await oai.beta.realtime.sessions.create({
       input_audio_format: "g711_ulaw",
       output_audio_format: "g711_ulaw",
-      ...bot,
+      ...bot.session,
     });
 
     const response = new twilio.twiml.VoiceResponse();
@@ -109,6 +109,14 @@ app.ws("/media-stream", async (ws, req) => {
 
     rt.send({ type: "input_audio_buffer.clear" });
     tw.send({ event: "clear", streamSid: tw.streamSid! });
+  });
+
+  rt.send({
+    type: "response.create",
+    response: {
+      modalities: ["text", "audio"],
+      instructions: `Say an introduction`,
+    },
   });
 
   // clean up websocket

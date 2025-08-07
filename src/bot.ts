@@ -1,10 +1,6 @@
 import { SessionCreateParams } from "openai/resources/beta/realtime/sessions";
 
-const bot: SessionCreateParams & { model: string } = {
-  // preview-2025-07-29 is not yet in the SDK
-  // @ts-ignore
-  model: "gpt-4o-realtime-preview-2025-07-29",
-
+const session: SessionCreateParams = {
   voice: "alloy",
 
   instructions: `## Objective
@@ -36,4 +32,8 @@ The caller is John Smith
   `,
 };
 
-export default bot;
+export default {
+  session,
+  model: "gpt-4o-realtime-preview-2025-07-29",
+  introduction: ``,
+};
