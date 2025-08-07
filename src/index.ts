@@ -108,8 +108,9 @@ app.ws("/media-stream/:client_secret", async (ws, req) => {
   );
 
   // clear buffer when the user starts speaking
-  rt.on("input_audio_buffer.speech_started", () => {
+  rt.on("input_audio_buffer.speech_started", (msg) => {
     log.app.info("user started speaking");
+    log.app.info(msg);
 
     rt.send({ type: "input_audio_buffer.clear" });
     tw.send({ event: "clear", streamSid: tw.streamSid! });
