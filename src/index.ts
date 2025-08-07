@@ -54,6 +54,11 @@ app.post("/call-status", async (req, res) => {
 app.ws("/media-stream", (ws) => {
   const tw = new TwilioWebsocket(ws);
   const rt = new OpenAIRealtimeWebSocket({ model: config.openai.model });
+
+  // clean up websocket
+  ws.on("close", () => {
+    rt.close();
+  });
 });
 
 /****************************************************
