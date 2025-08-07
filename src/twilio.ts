@@ -1,89 +1,56 @@
 import type { WebSocket } from "ws";
 
-export class TwilioWebsocket {
-  streamId: string | undefined;
+export class TwilioMediaStreamWebsocket {
+  private ws: WebSocket;
+  public conf: StartEvent["start"] | undefined;
+  public setupPromise: Promise<void>;
 
-  constructor(ws: WebSocket) {}
-}
+  constructor(ws: WebSocket) {
+    this.ws = ws;
 
-let streamSid: string;
-export const setStreamSid = (sid: string) => (streamSid = sid);
+    this.setupPromise = new Promise((resolve) => {
+      this.on("start", (msg: StartEvent) => {
+        this.conf = msg["start"];
+        resolve();
+      });
+    });
+  }
 
-export let ws: WebSocket; // This demo only supports on call at a time, hence the Twilio Media Stream websocket is globally scoped.
-export const setWs = (wss: WebSocket) => (ws = wss);
+  send(action: TwilioStreamAction) {
+    this.ws.send(JSON.stringify(action));
+  }
 
-// ========================================
-// Media Stream Actions
-// https://www.twilio.com/docs/voice/media-streams/websocket-messages#send-websocket-messages-to-twilio
-// ========================================
-
-/** Clear Twilio's audio buffer (https://www.twilio.com/docs/voice/media-streams/websocket-messages#send-a-clear-message) */
-export function clearAudio() {
-  ws?.send(JSON.stringify({ event: "clear", streamSid }));
-}
-
-/** Send raw audio to Twilio call (https://www.twilio.com/docs/voice/media-streams/websocket-messages#send-a-media-message) */
-export function sendAudio(audio: string) {
-  ws?.send(
-    JSON.stringify({ event: "media", streamSid, media: { payload: audio } }),
-  );
-}
-
-// ========================================
-// Websocket Listeners
-// https://www.twilio.com/docs/voice/media-streams/websocket-messages#websocket-messages-from-twilio
-// ========================================
-
-/** Adds an listener to an incoming message type from Twilio's Media Stream */
-export function onMessage<T extends TwilioStreamMessageTypes>(
-  type: T,
-  callback: (message: TwilioStreamMessage & { event: T }) => void,
-) {
-  ws.on("message", (data) => {
-    const msg = JSON.parse(data.toString()) as TwilioStreamMessage;
-    if (msg.event === type) callback(msg as TwilioStreamMessage & { event: T });
-  });
+  on<K extends TwilioStreamMessageTypes>(
+    event: K,
+    handler: (msg: Extract<TwilioStreamMessage, { event: K }>) => void,
+  ) {
+    this.ws.on("message", (data) => {
+      const msg = JSON.parse(event.toString()) as TwilioStreamMessage;
+      if (msg.event === event) handler(msg);
+    });
+  }
 }
 
 // ========================================
-// Twilio Media Stream Actions
-// https://www.twilio.com/docs/voice/media-streams/websocket-messages#send-websocket-messages-to-twilio
+// Twilio Media Stream Types
 // ========================================
-
 export type TwilioStreamAction = Clear | SendAudio | SendMark;
 
-type Clear = {
-  event: "clear";
-  streamSid: string;
-};
-
+type Clear = { event: "clear"; streamSid: string };
 type SendAudio = {
   event: "media";
   streamSid: string;
   media: { payload: string };
 };
-
-type SendMark = {
-  event: "mark";
-  streamSid: string;
-  mark: { name: string };
-};
-
-// ========================================
-// Twilio Media Stream Messages
-// https://www.twilio.com/docs/voice/media-streams/websocket-messages
-// ========================================
+type SendMark = { event: "mark"; streamSid: string; mark: { name: string } };
 
 export type TwilioStreamMessage =
   | ConnectedEvent
+  | StartEvent
+  | MediaEvent
   | DTMFEvent
   | MarkEvent
-  | MediaEvent
-  | StartEvent
   | StopEvent;
-
-type ExtractMessageEvent<T> = T extends { event: infer U } ? U : never;
-export type TwilioStreamMessageTypes = ExtractMessageEvent<TwilioStreamMessage>;
 
 type ConnectedEvent = {
   event: "connected";
@@ -91,7 +58,36 @@ type ConnectedEvent = {
   version: string;
 };
 
-type DTMFEvent = {
+export type StartEvent = {
+  event: "start";
+  sequenceNumber: number;
+  start: {
+    streamSid: string;
+    accountSid: string;
+    callSid: string;
+    tracks: ("inbound" | "outbound")[];
+    mediaFormat: {
+      encoding: "audio/x-mulaw";
+      sampleRate: number;
+      channels: number;
+    };
+    customParameters: Record<string, unknown>;
+  };
+};
+
+export type MediaEvent = {
+  event: "media";
+  sequenceNumber: number;
+  media: {
+    track: string;
+    chunk: string;
+    timestamp: string;
+    payload: string;
+  };
+  streamSid: string;
+};
+
+export type DTMFEvent = {
   event: "dtmf";
   dtmf: { digit: string; track: string };
   sequenceNumber: number;
@@ -105,35 +101,11 @@ export type MarkEvent = {
   streamSid: string;
 };
 
-export type MediaEvent = {
-  event: "media";
-  sequenceNumber: number;
-  media: { track: string; chunk: string; timestamp: string; payload: string };
-  streamSid: string;
-};
-
-type StartEvent = {
-  event: "start";
-  sequenceNumber: string;
-  start: {
-    accountSid: string;
-    streamSid: string;
-    callSid: string;
-    tracks: string[];
-    mediaFormat: { encoding: string; sampleRate: number; channels: number };
-    customParameters: Record<string, unknown>;
-  };
-  streamSid: string;
-};
-
-type StopEvent = {
+export type StopEvent = {
   event: "stop";
-  sequenceNumber: string;
+  sequenceNumber: number;
   streamSid: string;
   stop: { accountSid: string; callSid: string };
 };
 
-// ========================================
-// Misc Twilio
-// ========================================
-export type CallStatus = "completed" | "initializing" | "started" | "error";
+export type TwilioStreamMessageTypes = TwilioStreamMessage["event"];
