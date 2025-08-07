@@ -1,13 +1,12 @@
-import dotenv from "dotenv-flow";
+import "dotenv-flow/config";
 import express from "express";
 import ExpressWs from "express-ws";
+import OpenAI from "openai";
+import { OpenAIRealtimeWebSocket } from "openai/beta/realtime/websocket";
+import bot from "./bot";
 import log from "./logger";
-import * as oai from "./openai";
-import config from "./openai-config";
 import type { CallStatus } from "./twilio";
-import * as twlo from "./twilio";
-
-dotenv.config();
+import { TwilioMediaStreamWebsocket } from "./twilio";
 
 const { app } = ExpressWs(express());
 app.use(express.urlencoded({ extended: true })).use(express.json());
@@ -19,25 +18,27 @@ app.post("/incoming-call", async (req, res) => {
   log.twl.info(`incoming-call from ${req.body.From} to ${req.body.To}`);
 
   try {
-    oai.createWebsocket(); // This demo only supports one call at a time, hence a single OpenAI websocket is stored globally
-    oai.ws.on("open", () => log.oai.info("openai websocket opened"));
-    oai.ws.on("error", (err) => log.oai.error("openai websocket error", err));
-
-    // The incoming-call webhook is blocked until the OpenAI websocket is connected.
-    // This ensures Twilio's Media Stream doesn't send audio packets to OpenAI prematurely.
-    await oai.wsPromise;
+    // The OpenAI Realtime session is created in the incoming-call webhook to avoid an
+    // extra delay after the call is connected. The client_secret returned here is tied
+    // to the session and is passed to the websocket relay via route parameter.
+    const oai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const session = await oai.beta.realtime.sessions.create({
+      input_audio_format: "g711_ulaw",
+      output_audio_format: "g711_ulaw",
+      ...bot.session,
+    });
 
     res.status(200);
     res.type("text/xml");
 
     // The <Stream/> TwiML noun tells Twilio to send the call to the websocket endpoint below.
-    res.end(`
-        <Response>
-          <Connect>
-            <Stream url="wss://${process.env.HOSTNAME}/media-stream" />
-          </Connect>
-        </Response>
-        `);
+    res.end(`\
+<Response>
+  <Connect>
+    <Stream url="wss://${process.env.HOSTNAME}/media-stream/${session.client_secret.value}" />
+  </Connect>
+</Response>
+`);
   } catch (error) {
     log.oai.error(
       "incoming call webhook failed, probably because OpenAI websocket could not connect.",
@@ -53,64 +54,70 @@ app.post("/call-status", async (req, res) => {
   if (status === "error") log.twl.error(`call-status ${status}`);
   else log.twl.info(`call-status ${status}`);
 
-  if (status === "error" || status === "completed") oai.closeWebsocket();
-
   res.status(200).send();
 });
 
 // ========================================
 // Twilio Media Stream Websocket Endpoint
 // ========================================
-app.ws("/media-stream", (ws, req) => {
-  log.twl.info("incoming websocket");
+app.ws("/media-stream/:client_secret", async (ws, req) => {
+  log.twl.info("websocket initializing");
 
-  twlo.setWs(ws); // set the Twilio Media Stream websocket
-  twlo.ws.on("error", (err) => log.twl.error(`websocket error`, err));
+  const tw = new TwilioMediaStreamWebsocket(ws);
+  const rt = new OpenAIRealtimeWebSocket(
+    { model: bot.model },
+    new OpenAI({ apiKey: req.params.client_secret! }), // client_secret links the session configuration
+  );
 
-  const typeSet = new Set<string>();
+  // both websockets must be connected before any media can be relayed
+  await Promise.all([
+    new Promise((resolve) => rt.on("session.created", () => resolve(null))),
+    new Promise((resolve) =>
+      tw.on("start", (msg) => {
+        tw.streamSid = msg.start.streamSid; // streamSid is needed to send actions
+        resolve(null);
+      }),
+    ),
+  ]);
 
-  oai.ws.on("message", (data: any) => {
-    const msg = JSON.parse(data);
-    if (!typeSet.has(msg.type)) {
-      log.oai.info(`new message type: ${msg.type}. msg: `, msg);
-    }
-    typeSet.add(msg.type);
+  log.twl.info("websocket connected");
+
+  // prompts the agent to say something
+  rt.send({
+    type: "response.create",
+    response: {
+      instructions: `You just answered the call. Say hello in English.`,
+    },
   });
 
-  // twilio media stream starts
-  twlo.onMessage("start", (msg) => {
-    log.twl.success("media stream started");
-    twlo.setStreamSid(msg.streamSid);
+  // ========================================
+  // Audio Orchestration
+  // ========================================
+  // send bot's speech to twilio
+  rt.on("response.audio.delta", (msg) =>
+    tw.send({
+      event: "media",
+      media: { payload: msg.delta },
+      streamSid: tw.streamSid!,
+    }),
+  );
 
-    // OpenAI's websocket session parameters should probably be set when the it is
-    // initialized. However, setting them slightly later (i.e. when the Twilio Media starts)
-    // seems to make OpenAI's bot more responsive. I don't know why
-    oai.setSessionParams();
+  // send human speech to openai
+  tw.on("media", (msg) =>
+    rt.send({ type: "input_audio_buffer.append", audio: msg.media.payload }),
+  );
 
-    oai.speak(config.introduction); // tell OpenAI to speak the introduction
-  });
-
-  // relay audio packets between Twilio & OpenAI
-  oai.onMessage("response.audio.delta", (msg) => twlo.sendAudio(msg.delta));
-  twlo.onMessage("media", (msg) => oai.sendAudio(msg.media.payload));
-
-  // user starts talking
-  oai.onMessage("input_audio_buffer.speech_started", (msg) => {
+  // clear buffer when the user starts speaking
+  rt.on("input_audio_buffer.speech_started", () => {
     log.app.info("user started speaking");
 
-    oai.clearAudio(); // tell OpenAI to stop sending audio
-    twlo.clearAudio(); // tell Twilio to stop playing any audio that it has buffered
+    rt.send({ type: "input_audio_buffer.clear" });
+    tw.send({ event: "clear", streamSid: tw.streamSid! });
   });
 
-  // bot final transcript
-  oai.onMessage("response.audio_transcript.done", (msg) => {
-    log.oai.info("bot transcript (final): ", msg.transcript);
-  });
-
-  twlo.ws.on("close", () => {
-    log.app.info("websocket closed");
-
-    log.oai.info("types: ", [...typeSet]);
+  // clean up websocket
+  ws.on("close", () => {
+    rt.close();
   });
 });
 
