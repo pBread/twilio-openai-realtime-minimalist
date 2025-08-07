@@ -8,6 +8,7 @@ import { TwilioMediaStreamWebsocket } from "./twilio";
 import { OpenAIRealtimeWebSocket } from "openai/beta/realtime/websocket";
 import OpenAI from "openai";
 import { SessionCreateResponse } from "openai/resources/beta/realtime/sessions";
+import twilio from "twilio";
 
 const { app } = ExpressWs(express());
 app.use(express.urlencoded({ extended: true })).use(express.json());
@@ -15,7 +16,6 @@ app.use(express.urlencoded({ extended: true })).use(express.json());
 // ========================================
 // Twilio Voice Webhook Endpoints
 // ========================================
-let clientSecret: SessionCreateResponse.ClientSecret;
 
 app.post("/incoming-call", async (req, res) => {
   log.twl.info(`incoming-call from ${req.body.From} to ${req.body.To}`);
@@ -32,7 +32,13 @@ app.post("/incoming-call", async (req, res) => {
       turn_detection: { type: "server_vad" },
     });
 
-    clientSecret = session.client_secret;
+    const response = new twilio.twiml.VoiceResponse();
+    const connect = response.connect();
+    const stream = connect.stream({
+      url: `wss://${process.env.HOSTNAME}/media-stream`,
+    });
+
+    stream.parameter({ name: "jwe", value: session.client_secret.value });
 
     log.app.info("session", session);
 
@@ -40,13 +46,7 @@ app.post("/incoming-call", async (req, res) => {
     res.type("text/xml");
 
     // The <Stream/> TwiML noun tells Twilio to send the call to the websocket endpoint below.
-    res.end(`
-        <Response>
-          <Connect>
-            <Stream url="wss://${process.env.HOSTNAME}/media-stream" />
-          </Connect>
-        </Response>
-        `);
+    res.end(response.toString());
   } catch (error) {
     log.oai.error(
       "incoming call webhook failed, probably because OpenAI websocket could not connect.",
@@ -71,27 +71,32 @@ app.post("/call-status", async (req, res) => {
 app.ws("/media-stream", async (ws, req) => {
   log.twl.info("websocket initializing");
 
-  const client = new OpenAI({ apiKey: clientSecret.value });
+  let apiKey: string;
+
+  const tw = new TwilioMediaStreamWebsocket(ws);
+  await new Promise((resolve) => {
+    tw.on("start", (msg) => {
+      tw.streamSid = msg.start.streamSid;
+      log.twl.info("msg.start.customParameters", msg.start.customParameters);
+
+      apiKey = msg.start.customParameters["jwe"] as string;
+
+      log.twl.info("apiKey", apiKey);
+
+      resolve(null);
+    });
+  });
+
+  const client = new OpenAI({ apiKey: apiKey! });
   const rt = new OpenAIRealtimeWebSocket(
     {
       model: "gpt-4o-realtime-preview-2025-07-29",
     },
     client,
   );
-  const tw = new TwilioMediaStreamWebsocket(ws);
-
   rt.on("session.created", (msg) => log.oai.info("session.created\n", msg));
 
-  // await for both websockets to be connected
-  await Promise.all([
-    new Promise((resolve) => rt.on("session.created", () => resolve(null))),
-    new Promise((resolve) =>
-      tw.on("start", (msg) => {
-        tw.streamSid = msg.start.streamSid;
-        resolve(null);
-      }),
-    ),
-  ]);
+  await new Promise((resolve) => rt.on("session.created", () => resolve(null)));
 
   log.app.info("promises resolved");
 
