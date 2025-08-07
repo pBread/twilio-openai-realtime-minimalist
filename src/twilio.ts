@@ -1,5 +1,11 @@
 import type { WebSocket } from "ws";
 
+export class TwilioWebsocket {
+  streamId: string | undefined;
+
+  constructor(ws: WebSocket) {}
+}
+
 let streamSid: string;
 export const setStreamSid = (sid: string) => (streamSid = sid);
 

@@ -1,47 +1,34 @@
 import WS from "ws";
 import config from "./openai-config";
 import log from "./logger";
+import { OpenAIRealtimeWebSocket } from "openai/beta/realtime/websocket";
+
+export class OpenAIRealtimeAdapter extends OpenAIRealtimeWebSocket {
+  constructor(params: { model: string }) {
+    super(params);
+  }
+
+  clearAudio = () => this.send({ type: "input_audio_buffer.clear" });
+  speak = (text: string) =>
+    this.send({
+      type: "response.create",
+      response: {
+        // instructions: `Say this:\n${text}`,
+        input: [
+          {
+            type: "message",
+            role: "assistant",
+            content: [{ text, type: "input_text" }],
+          },
+        ],
+      },
+    });
+}
 
 // ========================================
 // Websocket Lifecycle
 // https://platform.openai.com/docs/guides/realtime/overview
 // ========================================
-export let ws: WS; // This demo only supports on call at a time hence the OpenAI websocket is globally scoped.
-export let wsPromise: Promise<void>;
-
-export function createWebsocket() {
-  // websocket must be closed or uninitialized
-  if (ws && ws?.readyState !== ws.CLOSED)
-    throw Error(`Only one call allowed at a time.`);
-
-  wsPromise = new Promise<void>((resolve, reject) => {
-    ws = new WS(config.openai.wsUrl, {
-      headers: {
-        Authorization: "Bearer " + process.env.OPENAI_API_KEY,
-        "OpenAI-Beta": "realtime=v1",
-      },
-    });
-
-    ws.on("open", () => resolve());
-    ws.on("unexpected-response", (_, msg) => reject(msg));
-  });
-
-  return wsPromise;
-}
-
-export async function closeWebsocket(): Promise<void> {
-  return new Promise((resolve) => {
-    if (!ws) {
-      log.oai.warn("no WebSocket connection to disconnect");
-      resolve();
-      return;
-    }
-
-    ws.on("close", () => resolve());
-
-    ws.close();
-  });
-}
 
 // ========================================
 // Websocket Actions
