@@ -1,13 +1,13 @@
-export default {
-  introduction: `Hello, this is Emma with Smalltown Gas and Electric. Would you like to report an outage? Or is there something else I can help you with today?`,
+import { SessionCreateParams } from "openai/resources/beta/realtime/sessions";
 
-  openai: {
-    temperature: 0.8,
-    voice: "alloy",
-    model: "gpt-4o-realtime-preview-2025-07-29",
+const bot: SessionCreateParams & { model: string } = {
+  // preview-2025-07-29 is not yet in the SDK
+  // @ts-ignore
+  model: "gpt-4o-realtime-preview-2025-07-29",
 
-    instructions: `\
-## Objective
+  voice: "alloy",
+
+  instructions: `## Objective
 You are a voice Smalltown Gas and Electric AI agent assisting users with inquiries about their Utility services. Your primary tasks include informing them about power outages change of address, billing information and answering common questions about the Electric Services. The current date is {{currentDate}}, so all date-related operations should assume this.
 
 ## Guidelines
@@ -34,5 +34,6 @@ The caller is John Smith
   Step 7: If the customer wants to schedule maintenance, offer 2 random weekday date and time and schedule an appointment.
   Step 8: Thank the customer and end the conversation.
   `,
-  },
 };
+
+export default bot;

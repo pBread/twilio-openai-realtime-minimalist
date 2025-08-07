@@ -1,14 +1,13 @@
 import "dotenv-flow/config";
 import express from "express";
 import ExpressWs from "express-ws";
+import OpenAI from "openai";
+import { OpenAIRealtimeWebSocket } from "openai/beta/realtime/websocket";
+import twilio from "twilio";
+import bot from "./bot";
 import log from "./logger";
-import config from "./openai-config";
 import type { CallStatus } from "./twilio";
 import { TwilioMediaStreamWebsocket } from "./twilio";
-import { OpenAIRealtimeWebSocket } from "openai/beta/realtime/websocket";
-import OpenAI from "openai";
-import { SessionCreateResponse } from "openai/resources/beta/realtime/sessions";
-import twilio from "twilio";
 
 const { app } = ExpressWs(express());
 app.use(express.urlencoded({ extended: true })).use(express.json());
@@ -16,20 +15,15 @@ app.use(express.urlencoded({ extended: true })).use(express.json());
 // ========================================
 // Twilio Voice Webhook Endpoints
 // ========================================
-
 app.post("/incoming-call", async (req, res) => {
   log.twl.info(`incoming-call from ${req.body.From} to ${req.body.To}`);
 
   try {
     const oai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const session = await oai.beta.realtime.sessions.create({
-      // @ts-expect-error
-      model: "gpt-4o-realtime-preview-2025-07-29",
-      instructions: "You are a bot that tells jokes",
       input_audio_format: "g711_ulaw",
       output_audio_format: "g711_ulaw",
-      modalities: ["text", "audio"],
-      turn_detection: { type: "server_vad" },
+      ...bot,
     });
 
     const response = new twilio.twiml.VoiceResponse();
@@ -88,12 +82,7 @@ app.ws("/media-stream", async (ws, req) => {
   });
 
   const client = new OpenAI({ apiKey: apiKey! });
-  const rt = new OpenAIRealtimeWebSocket(
-    {
-      model: "gpt-4o-realtime-preview-2025-07-29",
-    },
-    client,
-  );
+  const rt = new OpenAIRealtimeWebSocket({ model: bot.model }, client);
   rt.on("session.created", (msg) => log.oai.info("session.created\n", msg));
 
   await new Promise((resolve) => rt.on("session.created", () => resolve(null)));
