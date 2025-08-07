@@ -10,15 +10,18 @@ import type { WebSocket } from "ws";
  */
 
 export class TwilioMediaStreamWebsocket {
-  private ws: WebSocket;
-  public conf: StartEvent["start"] | undefined;
-  public setupPromise: Promise<void>;
+  ws: WebSocket;
+
+  conf: StartEvent["start"] | undefined;
+  streamSid!: string;
+  setupPromise: Promise<void>;
 
   constructor(ws: WebSocket) {
     this.ws = ws;
 
     this.setupPromise = new Promise((resolve) => {
       this.on("start", (msg: StartEvent) => {
+        this.streamSid = msg.start.streamSid;
         this.conf = msg.start;
         resolve();
       });
@@ -117,3 +120,8 @@ export type StopEvent = {
 };
 
 export type TwilioStreamMessageTypes = TwilioStreamMessage["event"];
+
+// ========================================
+// Miscellaneous Twilio Types
+// ========================================
+export type CallStatus = "completed" | "initializing" | "started" | "error";

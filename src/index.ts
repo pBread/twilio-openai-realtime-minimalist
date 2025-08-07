@@ -4,7 +4,7 @@ import ExpressWs from "express-ws";
 import log from "./logger";
 import config from "./openai-config";
 import type { CallStatus } from "./twilio";
-import { TwilioWebsocket } from "./twilio";
+import { TwilioMediaStreamWebsocket } from "./twilio";
 import { OpenAIRealtimeWebSocket } from "openai/beta/realtime/websocket";
 
 dotenv.config();
@@ -51,9 +51,35 @@ app.post("/call-status", async (req, res) => {
 // ========================================
 // Twilio Media Stream Websocket Endpoint
 // ========================================
-app.ws("/media-stream", (ws) => {
-  const tw = new TwilioWebsocket(ws);
+app.ws("/media-stream", (ws, req) => {
+  log.app.info("req.body\n", req.body); // checking for payload
+  log.app.info("req.headers\n", req.headers); // checking for payload
+  log.app.info("req.params\n", req.params); // checking for payload
+
+  const tw = new TwilioMediaStreamWebsocket(ws);
   const rt = new OpenAIRealtimeWebSocket({ model: config.openai.model });
+
+  // send bot's speech to twilio
+  rt.on("response.audio.delta", (msg) =>
+    tw.send({
+      event: "media",
+      media: { payload: msg.delta },
+      streamSid: tw.streamSid,
+    }),
+  );
+
+  // send human speech to openai
+  tw.on("media", (msg) =>
+    rt.send({ type: "input_audio_buffer.append", audio: msg.media.payload }),
+  );
+
+  // clear buffer when the user starts speaking
+  rt.on("input_audio_buffer.speech_started", () => {
+    log.app.info("user started speaking");
+
+    rt.send({ type: "input_audio_buffer.clear" });
+    tw.send({ event: "clear", streamSid: tw.streamSid });
+  });
 
   // clean up websocket
   ws.on("close", () => {
