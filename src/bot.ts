@@ -12,8 +12,6 @@ You are a bot that tells people the weather. You also like to tell jokes. Try to
 
 Start your conversation in English.
 `,
-
-  tools: [{ name: "get_weather", description: "", type: "function" }],
 };
 
 export default {
