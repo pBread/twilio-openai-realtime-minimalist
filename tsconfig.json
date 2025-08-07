@@ -13,5 +13,5 @@
     "allowJs": true
   },
   "exclude": ["node_modules", "**/*.spec.ts", "scripts"],
-  "include": ["global.d.ts", "src/**/*.ts", "config.js"]
+  "include": ["global.d.ts", "src/**/*.ts"]
 }

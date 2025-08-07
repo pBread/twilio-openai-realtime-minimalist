@@ -6,7 +6,7 @@ export default {
     temperature: 0.8,
     voice: "alloy",
     wsUrl:
-      "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01",
+      "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2025-06-03",
 
     instructions: `\
 ## Objective

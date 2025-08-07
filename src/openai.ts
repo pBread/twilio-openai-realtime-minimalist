@@ -1,6 +1,13 @@
 import WS from "ws";
-import config from "../config";
+import config from "./openai-config";
 import log from "./logger";
+
+const introduction = `
+Hello, this is Emma with Smalltown Gas and Electric. How can I help you today?
+
+
+
+`;
 
 // ========================================
 // Websocket Lifecycle

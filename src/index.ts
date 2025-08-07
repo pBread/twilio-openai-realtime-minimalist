@@ -1,9 +1,9 @@
 import dotenv from "dotenv-flow";
 import express from "express";
 import ExpressWs from "express-ws";
-import config from "../config";
 import log from "./logger";
 import * as oai from "./openai";
+import config from "./openai-config";
 import type { CallStatus } from "./twilio";
 import * as twlo from "./twilio";
 
@@ -67,8 +67,14 @@ app.ws("/media-stream", (ws, req) => {
   twlo.setWs(ws); // set the Twilio Media Stream websocket
   twlo.ws.on("error", (err) => log.twl.error(`websocket error`, err));
 
-  oai.ws.on("message", (ev) => {
-    log.oai.info("oai msg", ev);
+  const typeSet = new Set<string>();
+
+  oai.ws.on("message", (data: any) => {
+    const msg = JSON.parse(data);
+    if (!typeSet.has(msg.type)) {
+      log.oai.info(`new message type: ${msg.type}. msg: `, msg);
+    }
+    typeSet.add(msg.type);
   });
 
   // twilio media stream starts
@@ -99,6 +105,12 @@ app.ws("/media-stream", (ws, req) => {
   // bot final transcript
   oai.onMessage("response.audio_transcript.done", (msg) => {
     log.oai.info("bot transcript (final): ", msg.transcript);
+  });
+
+  twlo.ws.on("close", () => {
+    log.app.info("websocket closed");
+
+    log.oai.info("types: ", [...typeSet]);
   });
 });
 
