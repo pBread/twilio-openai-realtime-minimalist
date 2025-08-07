@@ -67,6 +67,10 @@ app.ws("/media-stream", (ws, req) => {
   twlo.setWs(ws); // set the Twilio Media Stream websocket
   twlo.ws.on("error", (err) => log.twl.error(`websocket error`, err));
 
+  oai.ws.on("message", (ev) => {
+    log.oai.info("oai msg", ev);
+  });
+
   // twilio media stream starts
   twlo.onMessage("start", (msg) => {
     log.twl.success("media stream started");
