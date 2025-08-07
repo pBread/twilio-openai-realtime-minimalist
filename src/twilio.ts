@@ -11,21 +11,10 @@ import type { WebSocket } from "ws";
 
 export class TwilioMediaStreamWebsocket {
   ws: WebSocket;
-
-  conf: StartEvent["start"] | undefined;
-  streamSid!: string;
-  setupPromise: Promise<void>;
+  streamSid: string | undefined;
 
   constructor(ws: WebSocket) {
     this.ws = ws;
-
-    this.setupPromise = new Promise((resolve) => {
-      this.on("start", (msg: StartEvent) => {
-        this.streamSid = msg.start.streamSid;
-        this.conf = msg.start;
-        resolve();
-      });
-    });
   }
 
   send = (action: TwilioStreamAction) => this.ws.send(JSON.stringify(action));

@@ -51,20 +51,31 @@ app.post("/call-status", async (req, res) => {
 // ========================================
 // Twilio Media Stream Websocket Endpoint
 // ========================================
-app.ws("/media-stream", (ws, req) => {
+app.ws("/media-stream", async (ws, req) => {
   log.app.info("req.body\n", req.body); // checking for payload
   log.app.info("req.headers\n", req.headers); // checking for payload
   log.app.info("req.params\n", req.params); // checking for payload
 
-  const tw = new TwilioMediaStreamWebsocket(ws);
   const rt = new OpenAIRealtimeWebSocket({ model: config.openai.model });
+  const tw = new TwilioMediaStreamWebsocket(ws);
+
+  // await for both websockets to be connected
+  await Promise.all([
+    new Promise((resolve) => rt.on("session.created", () => resolve(null))),
+    new Promise((resolve) =>
+      tw.on("start", (msg) => {
+        tw.streamSid = msg.start.streamSid;
+        resolve(null);
+      }),
+    ),
+  ]);
 
   // send bot's speech to twilio
   rt.on("response.audio.delta", (msg) =>
     tw.send({
       event: "media",
       media: { payload: msg.delta },
-      streamSid: tw.streamSid,
+      streamSid: tw.streamSid!,
     }),
   );
 
@@ -78,7 +89,7 @@ app.ws("/media-stream", (ws, req) => {
     log.app.info("user started speaking");
 
     rt.send({ type: "input_audio_buffer.clear" });
-    tw.send({ event: "clear", streamSid: tw.streamSid });
+    tw.send({ event: "clear", streamSid: tw.streamSid! });
   });
 
   // clean up websocket
