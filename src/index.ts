@@ -4,8 +4,8 @@ import ExpressWs from "express-ws";
 import config from "../config";
 import log from "./logger";
 import * as oai from "./openai";
+import type { CallStatus } from "./twilio";
 import * as twlo from "./twilio";
-import type { CallStatus } from "./types";
 
 dotenv.config();
 
@@ -47,11 +47,11 @@ app.post("/incoming-call", async (req, res) => {
   }
 });
 
-app.post("/call-status-update", async (req, res) => {
+app.post("/call-status", async (req, res) => {
   const status = req.body.CallStatus as CallStatus;
 
-  if (status === "error") log.twl.error(`call-status-update ${status}`);
-  else log.twl.info(`call-status-update ${status}`);
+  if (status === "error") log.twl.error(`call-status ${status}`);
+  else log.twl.info(`call-status ${status}`);
 
   if (status === "error" || status === "completed") oai.closeWebsocket();
 
@@ -64,7 +64,7 @@ app.post("/call-status-update", async (req, res) => {
 app.ws("/media-stream", (ws, req) => {
   log.twl.info("incoming websocket");
 
-  twlo.setWs(ws);
+  twlo.setWs(ws); // set the Twilio Media Stream websocket
   twlo.ws.on("error", (err) => log.twl.error(`websocket error`, err));
 
   // twilio media stream starts
