@@ -19,8 +19,9 @@ app.post("/incoming-call", async (req, res) => {
   log.twl.info(`incoming-call from ${req.body.From} to ${req.body.To}`);
 
   try {
-    // The session is created in the incoming-call webhook to avoid an extra delay after the call
-    // is connected. The client_secret returned here is tied to the session and is passed to the WebSocket server via the <Parameter> element in the TwiML response.
+    // The OpenAI Realtime session is created in the incoming-call webhook to avoid an
+    // extra delay after the call is connected. The client_secret returned here is tied
+    // to the session and is passed to the websocket relay via route parameter.
     const oai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const session = await oai.beta.realtime.sessions.create({
       input_audio_format: "g711_ulaw",
@@ -35,9 +36,7 @@ app.post("/incoming-call", async (req, res) => {
     res.end(`\
 <Response>
   <Connect>
-    <Stream url="wss://${process.env.HOSTNAME}/media-stream/${session.client_secret.value}">
-      <Parameter name="client_secret" value="${session.client_secret.value}" />
-    </Stream>
+    <Stream url="wss://${process.env.HOSTNAME}/media-stream/${session.client_secret.value}" />
   </Connect>
 </Response>
 `);
@@ -65,28 +64,22 @@ app.post("/call-status", async (req, res) => {
 app.ws("/media-stream/:client_secret", async (ws, req) => {
   log.twl.info("websocket initializing");
 
-  console.log("req", req.params.client_secret);
-
-  // The client_secret is passed in the start message
-  let client_secret: string;
   const tw = new TwilioMediaStreamWebsocket(ws);
-  await new Promise((resolve) => {
-    tw.on("start", (msg) => {
-      tw.streamSid = msg.start.streamSid;
-      client_secret = msg.start.customParameters["client_secret"] as string;
-
-      resolve(null);
-    });
-  });
-
   const rt = new OpenAIRealtimeWebSocket(
     { model: bot.model },
-    new OpenAI({ apiKey: client_secret! }), // PROMPT: explain the session config is linked here. Concisely.
+    new OpenAI({ apiKey: req.params.client_secret! }), // client_secret links the session configuration
   );
-  // Wait until the OpenAI WebSocket is connected and the session is fully initialized
-  // before sending any audio. "session.created" is the first confirmation event.
 
-  await new Promise((resolve) => rt.on("session.created", () => resolve(null)));
+  // both websockets must be connected before any media can be relayed
+  await Promise.all([
+    new Promise((resolve) => rt.on("session.created", () => resolve(null))),
+    new Promise((resolve) =>
+      tw.on("start", (msg) => {
+        tw.streamSid = msg.start.streamSid; // streamSid is needed to send actions
+        resolve(null);
+      }),
+    ),
+  ]);
 
   // send bot's speech to twilio
   rt.on("response.audio.delta", (msg) =>
