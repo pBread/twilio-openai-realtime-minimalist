@@ -40,7 +40,7 @@ app.post("/incoming-call", async (req, res) => {
   } catch (error) {
     log.oai.error(
       "incoming call webhook failed, probably because OpenAI websocket could not connect.",
-      error
+      error,
     );
     res.status(500).send();
   }
@@ -58,7 +58,7 @@ app.post("/call-status-update", async (req, res) => {
 });
 
 /****************************************************
- Twilio Media Stream Websocket Endpoint 
+ Twilio Media Stream Websocket Endpoint
 ****************************************************/
 app.ws("/media-stream", (ws, req) => {
   log.twl.info("incoming websocket");
