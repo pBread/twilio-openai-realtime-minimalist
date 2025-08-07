@@ -3,7 +3,6 @@ import express from "express";
 import ExpressWs from "express-ws";
 import OpenAI from "openai";
 import { OpenAIRealtimeWebSocket } from "openai/beta/realtime/websocket";
-import twilio from "twilio";
 import bot from "./bot";
 import log from "./logger";
 import type { CallStatus } from "./twilio";
@@ -80,6 +79,8 @@ app.ws("/media-stream/:client_secret", async (ws, req) => {
       }),
     ),
   ]);
+
+  log.twl.info("websocket connected");
 
   // send bot's speech to twilio
   rt.on("response.audio.delta", (msg) =>
