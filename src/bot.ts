@@ -3,6 +3,10 @@ import { SessionCreateParams } from "openai/resources/beta/realtime/sessions";
 const session: SessionCreateParams = {
   voice: "alloy",
 
+  turn_detection: {
+    type: "server_vad",
+  },
+
   instructions: `## Objective
 You are a voice Smalltown Gas and Electric AI agent assisting users with inquiries about their Utility services. Your primary tasks include informing them about power outages change of address, billing information and answering common questions about the Electric Services. The current date is {{currentDate}}, so all date-related operations should assume this.
 
@@ -35,5 +39,4 @@ The caller is John Smith
 export default {
   session,
   model: "gpt-4o-realtime-preview-2025-07-29",
-  introduction: ``,
 };
