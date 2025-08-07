@@ -19,6 +19,8 @@ app.post("/incoming-call", async (req, res) => {
   log.twl.info(`incoming-call from ${req.body.From} to ${req.body.To}`);
 
   try {
+    // The session is created in the incoming-call webhook to avoid an extra delay after the call
+    // is connected. The client_secret returned here is tied to the session and is passed to the WebSocket server via the <Parameter> element in the TwiML response.
     const oai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const session = await oai.beta.realtime.sessions.create({
       input_audio_format: "g711_ulaw",
@@ -26,21 +28,19 @@ app.post("/incoming-call", async (req, res) => {
       ...bot.session,
     });
 
-    const response = new twilio.twiml.VoiceResponse();
-    const connect = response.connect();
-    const stream = connect.stream({
-      url: `wss://${process.env.HOSTNAME}/media-stream`,
-    });
-
-    stream.parameter({ name: "jwe", value: session.client_secret.value });
-
-    log.app.info("session", session);
-
     res.status(200);
     res.type("text/xml");
 
     // The <Stream/> TwiML noun tells Twilio to send the call to the websocket endpoint below.
-    res.end(response.toString());
+    res.end(`\
+<Response>
+  <Connect>
+    <Stream url="wss://${process.env.HOSTNAME}/media-stream/${session.client_secret.value}">
+      <Parameter name="client_secret" value="${session.client_secret.value}" />
+    </Stream>
+  </Connect>
+</Response>
+`);
   } catch (error) {
     log.oai.error(
       "incoming call webhook failed, probably because OpenAI websocket could not connect.",
@@ -62,32 +62,31 @@ app.post("/call-status", async (req, res) => {
 // ========================================
 // Twilio Media Stream Websocket Endpoint
 // ========================================
-app.ws("/media-stream", async (ws, req) => {
+app.ws("/media-stream/:client_secret", async (ws, req) => {
   log.twl.info("websocket initializing");
 
-  let apiKey: string;
+  console.log("req", req.params.client_secret);
 
+  // The client_secret is passed in the start message
+  let client_secret: string;
   const tw = new TwilioMediaStreamWebsocket(ws);
   await new Promise((resolve) => {
     tw.on("start", (msg) => {
       tw.streamSid = msg.start.streamSid;
-      log.twl.info("msg.start.customParameters", msg.start.customParameters);
-
-      apiKey = msg.start.customParameters["jwe"] as string;
-
-      log.twl.info("apiKey", apiKey);
+      client_secret = msg.start.customParameters["client_secret"] as string;
 
       resolve(null);
     });
   });
 
-  const client = new OpenAI({ apiKey: apiKey! });
-  const rt = new OpenAIRealtimeWebSocket({ model: bot.model }, client);
-  rt.on("session.created", (msg) => log.oai.info("session.created\n", msg));
+  const rt = new OpenAIRealtimeWebSocket(
+    { model: bot.model },
+    new OpenAI({ apiKey: client_secret! }), // PROMPT: explain the session config is linked here. Concisely.
+  );
+  // Wait until the OpenAI WebSocket is connected and the session is fully initialized
+  // before sending any audio. "session.created" is the first confirmation event.
 
   await new Promise((resolve) => rt.on("session.created", () => resolve(null)));
-
-  log.app.info("promises resolved");
 
   // send bot's speech to twilio
   rt.on("response.audio.delta", (msg) =>
@@ -111,10 +110,10 @@ app.ws("/media-stream", async (ws, req) => {
     tw.send({ event: "clear", streamSid: tw.streamSid! });
   });
 
+  // prompts the agent to say something
   rt.send({
     type: "response.create",
     response: {
-      modalities: ["text", "audio"],
       instructions: `You just answered the call. Say hello in English.`,
     },
   });
