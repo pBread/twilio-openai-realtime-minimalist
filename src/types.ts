@@ -1,7 +1,7 @@
-/****************************************************
- Open AI Actions
- https://platform.openai.com/docs/api-reference/realtime-client-events
-****************************************************/
+// ========================================
+// Open AI Actions
+// https://platform.openai.com/docs/api-reference/realtime-client-events
+// ========================================
 export type OpenAIActions =
   | ConversationItemCreate
   | ConversationItemDelete
@@ -315,10 +315,11 @@ type SendMark = {
   mark: { name: string };
 };
 
-/****************************************************
- Twilio Media Stream Messages
- https://www.twilio.com/docs/voice/media-streams/websocket-messages
-****************************************************/
+// ========================================
+// Twilio Media Stream Messages
+// https://www.twilio.com/docs/voice/media-streams/websocket-messages
+// ========================================
+
 export type TwilioStreamMessage =
   | ConnectedEvent
   | DTMFEvent
@@ -378,7 +379,7 @@ type StopEvent = {
   stop: { accountSid: string; callSid: string };
 };
 
-/****************************************************
- Misc Twilio
-****************************************************/
+// ========================================
+// Misc Twilio
+// ========================================
 export type CallStatus = "completed" | "initializing" | "started" | "error";
