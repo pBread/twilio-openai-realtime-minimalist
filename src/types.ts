@@ -116,10 +116,11 @@ type Tool = {
   };
 };
 
-/****************************************************
- Open AI Real Stime Websocket Events
- https://platform.openai.com/docs/api-reference/realtime-server-events
-****************************************************/
+// ========================================
+// Open AI Real Stime Websocket Events
+// https://platform.openai.com/docs/api-reference/realtime-server-events
+// ========================================
+
 export type OpenAIStreamMessage =
   | ConversationItemCreatedEvent
   | ErrorEvent
@@ -290,10 +291,11 @@ type RealtimeResponse = {
   usage: any | null;
 };
 
-/****************************************************
- Twilio Media Stream Actions
- https://www.twilio.com/docs/voice/media-streams/websocket-messages#send-websocket-messages-to-twilio
-****************************************************/
+// ========================================
+// Twilio Media Stream Actions
+// https://www.twilio.com/docs/voice/media-streams/websocket-messages#send-websocket-messages-to-twilio
+// ========================================
+
 export type TwilioStreamAction = Clear | SendAudio | SendMark;
 
 type Clear = {
