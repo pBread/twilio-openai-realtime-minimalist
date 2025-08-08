@@ -1,6 +1,6 @@
 # Minimalist Voice Bot with Twilio & OpenAI Realtime
 
-This project demonstrates how to integrate [Twilio's Programmable Voice API](https://www.twilio.com/docs/voice) with [OpenAI's real-time streaming API](https://platform.openai.com/docs/guides/realtime/overview) to enable real-time voice agents. Users can make voice calls via Twilio and the system proxies the audio with OpenAI's Realtime API.
+This project demonstrates how to integrate [Twilio's Programmable Voice API](https://www.twilio.com/docs/voice) with [OpenAI's real-time streaming API](https://platform.openai.com/docs/guides/realtime/overview). It is intentionally minimal. The goal is simply to show how a [Twilio Media Stream](https://www.twilio.com/docs/voice/media-streams) connects to the OpenAI Realtime API and exchanges audio in both directions.
 
 ## How it Works
 
