@@ -1,7 +1,7 @@
 import { SessionCreateParams } from "openai/resources/beta/realtime/sessions";
 
 const session: SessionCreateParams = {
-  voice: "alloy",
+  voice: "marin",
 
   turn_detection: { type: "server_vad" },
 
@@ -10,5 +10,5 @@ const session: SessionCreateParams = {
 
 export default {
   session,
-  model: "gpt-4o-realtime-preview",
+  model: "gpt-4o-realtime-preview-2025-07-29",
 };

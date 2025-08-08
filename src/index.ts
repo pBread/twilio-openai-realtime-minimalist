@@ -94,13 +94,13 @@ app.ws("/media-stream/:client_secret", async (ws, req) => {
   // Audio Orchestration
   // ========================================
   // send bot's speech to twilio
-  rt.on("response.audio.delta", (msg) =>
-    tw.send({
+  rt.on("response.audio.delta", (msg) => {
+    return tw.send({
       event: "media",
       media: { payload: msg.delta },
       streamSid: tw.streamSid!,
-    }),
-  );
+    });
+  });
 
   // send human speech to openai
   tw.on("media", (msg) =>
@@ -108,9 +108,8 @@ app.ws("/media-stream/:client_secret", async (ws, req) => {
   );
 
   // clear buffer when the user starts speaking
-  rt.on("input_audio_buffer.speech_started", (msg) => {
+  rt.on("input_audio_buffer.speech_started", () => {
     log.app.info("user started speaking");
-    log.app.info(msg);
 
     rt.send({ type: "input_audio_buffer.clear" });
     tw.send({ event: "clear", streamSid: tw.streamSid! });
